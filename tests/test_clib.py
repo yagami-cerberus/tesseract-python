@@ -9,8 +9,8 @@ import numpy
 class TestClib(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from tesseract import _tesseract
-        cls._tesseract = _tesseract
+        import tesseract
+        cls._tesseract = tesseract
 
     def test_config_variable(self):
         config_name = "tessedit_pageseg_mode"
