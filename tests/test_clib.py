@@ -4,6 +4,9 @@ from PIL import Image
 import tempfile
 import unittest
 import numpy
+import os
+
+SAMPLE_IMG = os.path.join(os.path.dirname(__file__), "sample.png")
 
 
 class TestClib(unittest.TestCase):
@@ -35,7 +38,7 @@ class TestClib(unittest.TestCase):
         t = self._tesseract.Tesseract(lang="eng")
         self.assertEqual(t.get_lang(), "eng")
 
-        image = Image.open("/Users/Cerberus/Desktop/sample.png")
+        image = Image.open(SAMPLE_IMG)
         img = numpy.asarray(image)
         t.set_rgb_image(img)
 
@@ -44,3 +47,15 @@ class TestClib(unittest.TestCase):
 
         all_word_conf = t.all_word_confidences()
         self.assertEqual(len(all_word_conf), 1)
+
+    def test_recognize(self):
+        t = self._tesseract.Tesseract(lang="eng")
+        self.assertEqual(t.get_lang(), "eng")
+
+        image = Image.open(SAMPLE_IMG)
+        img = numpy.asarray(image)
+        t.set_rgb_image(img)
+
+        t.recognize()
+        results = list(t.get_results(self._tesseract.ENUM_RIL_SYMBOL))
+        self.assertEqual(len(results), 4)

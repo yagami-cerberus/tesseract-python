@@ -4,14 +4,25 @@ cdef extern from "version.h":
 
 from libtesseract cimport (
     TessBaseAPI,
+    ResultIterator,
+
     PageSegMode,
     PSM_OSD_ONLY, PSM_AUTO_OSD, PSM_AUTO_ONLY, PSM_AUTO, PSM_SINGLE_COLUMN,
     PSM_SINGLE_BLOCK_VERT_TEXT, PSM_SINGLE_BLOCK, PSM_SINGLE_LINE,
     PSM_SINGLE_WORD, PSM_CIRCLE_WORD, PSM_SINGLE_CHAR, PSM_SPARSE_TEXT,
     PSM_SPARSE_TEXT_OSD, PSM_RAW_LINE, PSM_COUNT,
 
+    OcrEngineMode,
     OEM_TESSERACT_ONLY, OEM_CUBE_ONLY, OEM_TESSERACT_CUBE_COMBINED,
-    OEM_DEFAULT)
+    OEM_DEFAULT,
+
+    PageIteratorLevel,
+    RIL_BLOCK,
+    RIL_PARA,
+    RIL_TEXTLINE,
+    RIL_WORD,
+    RIL_SYMBOL)
+
 from libc.stdlib cimport free
 from libc.stdio cimport FILE, fopen, fclose
 from libcpp cimport bool
@@ -19,8 +30,10 @@ cimport numpy as np
 
 ctypedef np.uint8_t DTYPE_UINT8
 
-__version__ = PACKAGE_VERSION.decode("ascii")
+from collections import namedtuple
 
+
+__version__ = PACKAGE_VERSION.decode("ascii")
 
 ENUM_PSM_OSD_ONLY = PSM_OSD_ONLY
 ENUM_PSM_AUTO_OSD = PSM_AUTO_OSD
@@ -42,6 +55,14 @@ ENUM_OEM_TESSERACT_ONLY = OEM_TESSERACT_ONLY
 ENUM_OEM_CUBE_ONLY = OEM_CUBE_ONLY
 ENUM_OEM_TESSERACT_CUBE_COMBINED = OEM_TESSERACT_CUBE_COMBINED
 ENUM_OEM_DEFAULT = OEM_DEFAULT
+
+ENUM_RIL_BLOCK = RIL_BLOCK
+ENUM_RIL_PARA = RIL_PARA
+ENUM_RIL_TEXTLINE = RIL_TEXTLINE
+ENUM_RIL_WORD = RIL_WORD
+ENUM_RIL_SYMBOL = RIL_SYMBOL
+
+TessResult = namedtuple("TessResult", "text confidence x1 y1 x2 y2")
 
 
 cdef class Tesseract:
@@ -141,6 +162,37 @@ cdef class Tesseract:
             return ret
         finally:
             free(conf)
+
+    def set_rectangle(self, int left, int top, int width, int height):
+        self.api.SetRectangle(left, top, width, height)
+
+    def recognize(self):
+        cdef int ret
+        ret = self.api.Recognize(NULL)
+        if ret != 0:
+            raise RuntimeError("Recognize error")
+
+    def get_results(self, PageIteratorLevel level=RIL_WORD):
+        cpdef int x1, y1, x2, y2
+        cpdef ResultIterator* ri
+        cpdef char* word
+        cpdef float conf
+        cpdef bool ret
+
+        ri = self.api.GetIterator()
+        ret = ri != NULL
+
+        while ret:
+            word = ri.GetUTF8Text(level)
+
+            try:
+                conf = ri.Confidence(level)
+                ri.BoundingBox(level, &x1, &y1, &x2, &y2)
+                yield TessResult(word.decode("utf8", "ignore"), conf, x1, y1, x2, y2)
+            finally:
+                free(word)
+
+            ret = ri.Next(level)
 
     def clear(self):
         self.api.Clear()
